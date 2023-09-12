@@ -2,31 +2,32 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import logging
 import ctypes
 import heapq
+import logging
 import math
 import time
-from typing import Dict, List, Tuple, Optional, TypedDict, DefaultDict
 from collections import defaultdict
 from pathlib import Path
+from typing import DefaultDict, Dict, List, Optional, Tuple, TypedDict
 
 import cv2
 import numpy as np
 import numpy.typing as npt
-from skimage import measure
-from shapely import geometry
 from OpenGL import GL
-
 from scipy.spatial import Delaunay
-from animated_drawings.model.transform import Transform
-from animated_drawings.model.time_manager import TimeManager
-from animated_drawings.model.retargeter import Retargeter
+from shapely import geometry
+from skimage import measure
+
+from animated_drawings.config import (CharacterConfig, MotionConfig,
+                                      RetargetConfig)
 from animated_drawings.model.arap import ARAP
 from animated_drawings.model.joint import Joint
 from animated_drawings.model.quaternions import Quaternions
+from animated_drawings.model.retargeter import Retargeter
+from animated_drawings.model.time_manager import TimeManager
+from animated_drawings.model.transform import Transform
 from animated_drawings.model.vectors import Vectors
-from animated_drawings.config import CharacterConfig, MotionConfig, RetargetConfig
 
 
 class AnimatedDrawingMesh(TypedDict):
@@ -50,6 +51,27 @@ class AnimatedDrawingRig(Transform):
     def __init__(self, char_cfg: CharacterConfig):
         """ Initializes character rig.  """
         super().__init__()
+
+        self.default_color = [0, 0, 0]
+
+        self.vertex_colors = {
+            'root': self.default_color,
+            'hip': self.default_color,
+            'torso': [255, 85, 0],
+            'neck': [255, 0, 0], # Use as nose for now
+            'right_shoulder': [255, 170, 0],
+            'right_elbow': [255, 255, 0],
+            'right_hand': [170, 255, 0],
+            'left_shoulder': [85, 255, 0],
+            'left_elbow': [0, 255, 0],
+            'left_hand': [0, 255, 85],
+            'right_hip': [0, 255, 170],
+            'right_knee': [0, 255, 255],
+            'right_foot': [0, 170, 255],
+            'left_hip': [0, 85, 255],
+            'left_knee': [0, 0, 255],
+            'left_foot': [85, 0, 255],
+        }
 
         # create dictionary populated with joints
         joints_d: Dict[str, AnimatedDrawingsJoint]
@@ -122,11 +144,17 @@ class AnimatedDrawingRig(Transform):
             p1 = c.get_world_position()
             p2 = parent.get_world_position()
 
+            child_color = np.array(self.vertex_colors.get(c.name, [0, 0, 0])) / 255  # Normalize color to child vertex
+            parent_color = np.array(self.vertex_colors.get(parent.name, [0, 0, 0])) / 255  # Normalize color to parent vertex
+
             self.vertices[pointer[0], 0:3] = p1
+            self.vertices[pointer[0], 3:6] = child_color
             self.vertices[pointer[0] + 1, 0:3] = p2
+            self.vertices[pointer[0] + 1, 3:6] = parent_color
             pointer[0] += 2
 
             self._compute_buffer_vertices(c, pointer)
+
 
     def _initialize_opengl_resources(self):
         self.vao = GL.glGenVertexArrays(1)
@@ -156,7 +184,6 @@ class AnimatedDrawingRig(Transform):
         self._is_opengl_initialized = True
 
     def _compute_and_buffer_vertex_data(self):
-
         self._compute_buffer_vertices(parent=self.root_joint, pointer=[0])
 
         GL.glBindVertexArray(self.vao)
@@ -203,10 +230,12 @@ class AnimatedDrawingRig(Transform):
         GL.glUniformMatrix4fv(model_loc, 1, GL.GL_FALSE, self._world_transform.T)
 
         GL.glBindVertexArray(self.vao)
-        GL.glDrawArrays(GL.GL_LINES, 0, len(self.vertices))
+
+        # Draw points with size 5
+        GL.glPointSize(5.0)
+        GL.glDrawArrays(GL.GL_POINTS, 0, len(self.vertices))
 
         GL.glEnable(GL.GL_DEPTH_TEST)
-
 
 class AnimatedDrawing(Transform, TimeManager):
     """
@@ -223,6 +252,8 @@ class AnimatedDrawing(Transform, TimeManager):
 
     def __init__(self, char_cfg: CharacterConfig, retarget_cfg: RetargetConfig, motion_cfg: MotionConfig):
         super().__init__()
+
+        self.joints_per_frame = []
 
         self.char_cfg: CharacterConfig = char_cfg
 
@@ -382,6 +413,21 @@ class AnimatedDrawing(Transform, TimeManager):
 
         # using new joint positions, calculate new mesh vertex xy positions
         control_points: npt.NDArray[np.float32] = self.rig.get_joints_2D_positions() - root_position[:2]
+        # # HACK STARTS
+        # import json
+
+        # joint_names = self.rig.root_joint.get_chain_joint_names()
+        # joint_positions = self.rig.get_joints_2D_positions()
+        # joint_positions = ((joint_positions + 0.5) * self.img_dim).astype(np.int32)
+        # joint_positions = dict(zip(joint_names, joint_positions.tolist()))
+        # self.joints_per_frame.append(joint_positions)
+
+        # # Save joints_per_frame to JSON file
+        # # with open(f'{self.img_dim}_joints_per_frame.json', 'w') as json_file:
+        # with open(f'{self.img_dim}_joints_per_frame.json', 'w') as json_file:
+        #     json.dump(self.joints_per_frame, json_file)
+
+        # # HACK ENDS
         self.vertices[:, :2] = self.arap.solve(control_points) + root_position[:2]
 
         # use the z position of the rig's root joint for all mesh vertices
