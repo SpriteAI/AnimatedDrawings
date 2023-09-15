@@ -127,8 +127,7 @@ class BVH(Transform, TimeManager):
             bone_vector.norm()
             vectors_cw_perpendicular_to_fwd.append(bone_vector)
 
-        # return Vectors(vectors_cw_perpendicular_to_fwd).average().perpendicular()
-        return Vectors(vectors_cw_perpendicular_to_fwd).average()
+        return Vectors(vectors_cw_perpendicular_to_fwd).average().perpendicular()
 
     @classmethod
     def from_file(cls, bvh_fn: str, start_frame_idx: int = 0, end_frame_idx: Optional[int] = None) -> BVH:
