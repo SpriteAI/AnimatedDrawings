@@ -9,11 +9,11 @@ view:
   DRAW_AD_TXTR: True
   DRAW_AD_COLOR: False
   DRAW_AD_MESH_LINES: False
-  USE_MESA: False
+  USE_MESA: True
   CAMERA_POS: [0.0, 0.7, 2.0]
   CAMERA_FWD: [0.0, 0.5, 2.0]
 controller:
-  MODE: 'interactive'
+  MODE: 'video_render'
   KEYBOARD_TIMESTEP: 0.0333  # only used if mode is 'interactive'
   OUTPUT_VIDEO_PATH: ./output_video.mp4  # only used if mode is 'video_render'
   OUTPUT_VIDEO_CODEC: avc1  # only used if mode is 'video_render'

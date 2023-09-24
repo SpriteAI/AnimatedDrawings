@@ -54,11 +54,12 @@ class AnimatedDrawingRig(Transform):
 
         self.default_color = [0, 0, 0]
 
-        self.vertex_colors = {
+        self.joint_colors = {
             'root': self.default_color,
             'hip': self.default_color,
-            'torso': [255, 85, 0],
-            'neck': [255, 0, 0], # Use as nose for now
+            'torso': [255, 85, 0], # openpose neck color
+            # 'neck': [255, 0, 0], # openpose nose color
+            'neck': self.default_color, # Don't use neck for openpose
             'right_shoulder': [255, 170, 0],
             'right_elbow': [255, 255, 0],
             'right_hand': [170, 255, 0],
@@ -71,13 +72,18 @@ class AnimatedDrawingRig(Transform):
             'left_hip': [0, 85, 255],
             'left_knee': [0, 0, 255],
             'left_foot': [85, 0, 255],
+            'right_eye': [170, 0, 255],
+            'left_eye': [255, 0, 255],
+            'right_ear': [255, 0, 170],
+            'left_ear': [255, 0, 85],
         }
 
         # create dictionary populated with joints
         joints_d: Dict[str, AnimatedDrawingsJoint]
-        joints_d = {joint['name']: AnimatedDrawingsJoint(joint['name'], *joint['loc']) for joint in char_cfg.skeleton}
+        joints_d = {joint['name']: AnimatedDrawingsJoint(joint['name'], *joint['loc'])
+                    for joint in char_cfg.skeleton}
 
-        # assign joints within dictionary as childre of their parents
+        # assign joints within dictionary as children of their parents
         for joint_d in char_cfg.skeleton:
             if joint_d['parent'] is None:
                 continue
@@ -144,8 +150,8 @@ class AnimatedDrawingRig(Transform):
             p1 = c.get_world_position()
             p2 = parent.get_world_position()
 
-            child_color = np.array(self.vertex_colors.get(c.name, [0, 0, 0])) / 255  # Normalize color to child vertex
-            parent_color = np.array(self.vertex_colors.get(parent.name, [0, 0, 0])) / 255  # Normalize color to parent vertex
+            child_color = np.array(self.joint_colors.get(c.name, [0, 0, 0])) / 255  # Normalize color to child vertex
+            parent_color = np.array(self.joint_colors.get(parent.name, [0, 0, 0])) / 255  # Normalize color to parent vertex
 
             self.vertices[pointer[0], 0:3] = p1
             self.vertices[pointer[0], 3:6] = child_color
@@ -197,7 +203,10 @@ class AnimatedDrawingRig(Transform):
     def _set_global_orientations(self, joint: AnimatedDrawingsJoint, bvh_orientations: Dict[str, float]) -> None:
         if joint.name in bvh_orientations.keys():
 
-            theta: float = bvh_orientations[str(joint.name)] - joint.starting_theta
+            if joint.name in ['right_eye', 'left_eye', 'right_ear', 'left_ear']:
+                theta = 0
+            else:
+                theta = bvh_orientations[str(joint.name)] - joint.starting_theta
             theta = np.radians(theta)
             joint.current_theta = theta
 
