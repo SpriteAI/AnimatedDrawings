@@ -422,21 +422,7 @@ class AnimatedDrawing(Transform, TimeManager):
 
         # using new joint positions, calculate new mesh vertex xy positions
         control_points: npt.NDArray[np.float32] = self.rig.get_joints_2D_positions() - root_position[:2]
-        # # HACK STARTS
-        # import json
 
-        # joint_names = self.rig.root_joint.get_chain_joint_names()
-        # joint_positions = self.rig.get_joints_2D_positions()
-        # joint_positions = ((joint_positions + 0.5) * self.img_dim).astype(np.int32)
-        # joint_positions = dict(zip(joint_names, joint_positions.tolist()))
-        # self.joints_per_frame.append(joint_positions)
-
-        # # Save joints_per_frame to JSON file
-        # # with open(f'{self.img_dim}_joints_per_frame.json', 'w') as json_file:
-        # with open(f'{self.img_dim}_joints_per_frame.json', 'w') as json_file:
-        #     json.dump(self.joints_per_frame, json_file)
-
-        # # HACK ENDS
         self.vertices[:, :2] = self.arap.solve(control_points) + root_position[:2]
 
         # use the z position of the rig's root joint for all mesh vertices

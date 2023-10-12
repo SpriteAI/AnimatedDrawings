@@ -3,16 +3,18 @@
 # LICENSE file in the root directory of this source tree.
 
 import logging
-from animated_drawings.model.bvh import BVH
+import math
+from typing import Dict, List, Tuple
+
 import numpy as np
 import numpy.typing as npt
-import math
-from animated_drawings.model.joint import Joint
 from sklearn.decomposition import PCA
-from typing import Tuple, List, Dict
-from animated_drawings.model.vectors import Vectors
-from animated_drawings.model.quaternions import Quaternions
+
 from animated_drawings.config import MotionConfig, RetargetConfig
+from animated_drawings.model.bvh import BVH
+from animated_drawings.model.joint import Joint
+from animated_drawings.model.quaternions import Quaternions
+from animated_drawings.model.vectors import Vectors
 
 x_axis = np.array([1.0, 0.0, 0.0], dtype=np.float32)
 z_axis = np.array([0.0, 0.0, 1.0], dtype=np.float32)
@@ -142,15 +144,16 @@ class Retargeter():
         angle = np.where(angle < 0.0, angle + 2*np.pi, angle)
 
         # rotate the skeleton's joint so it faces +X axis
-        for idx in range(self.joint_positions.shape[0]):
-            rot_mat = np.identity(3).astype(np.float32)
-            rot_mat[0, 0] = math.cos(angle[idx])
-            rot_mat[0, 2] = math.sin(angle[idx])
-            rot_mat[2, 0] = -math.sin(angle[idx])
-            rot_mat[2, 2] = math.cos(angle[idx])
+        # HACK : this rotation corrupts the skeleton's joint positions, hence distorts bone angles from +Y axis after projection.
+        # for idx in range(self.joint_positions.shape[0]):
+        #     rot_mat = np.identity(3).astype(np.float32)
+        #     rot_mat[0, 0] = math.cos(angle[idx])
+        #     rot_mat[0, 2] = math.sin(angle[idx])
+        #     rot_mat[2, 0] = -math.sin(angle[idx])
+        #     rot_mat[2, 2] = math.cos(angle[idx])
 
-            rotated_joints: npt.NDArray[np.float32] = rot_mat @ self.joint_positions[idx].reshape([-1, 3]).T
-            self.joint_positions[idx] = rotated_joints.T.reshape(self.joint_positions[idx].shape)
+        #     rotated_joints: npt.NDArray[np.float32] = rot_mat @ self.joint_positions[idx].reshape([-1, 3]).T
+        #     self.joint_positions[idx] = rotated_joints.T.reshape(self.joint_positions[idx].shape)
 
     def _determine_projection_plane_normal(self, group_name: str, joint_names: List[str], projection_method: str) -> npt.NDArray[np.float32]:
         """
@@ -314,7 +317,7 @@ class Retargeter():
         theta = np.degrees(theta) % 360.0
         theta = np.where(theta < 0.0, theta + 360, theta)
 
-        # save it
+        # save it. theta : shape of (frame_num,)
         self.char_joint_to_orientation[char_joint_name] = np.array(theta)
 
     def get_retargeted_frame_data(self, time: float) -> Tuple[Dict[str, float], Dict[str, float], npt.NDArray[np.float32]]:
